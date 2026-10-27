@@ -12,7 +12,7 @@
 
 # Must satisfy the `go` directive in go.mod. prometheus/client_golang requires
 # 1.25, so building on an older toolchain fails at `go mod download`.
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 # ---------------------------------------------------------------------------
 # Stage 1: build
