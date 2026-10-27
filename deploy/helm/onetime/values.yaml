@@ -551,6 +551,30 @@ extraVolumeMounts: []
 # -- Extra containers in the pod.
 extraContainers: []
 
+# -- Extra Kubernetes objects released with the chart, e.g. the ExternalSecret or
+# SealedSecret behind masterKey.existingSecret.
+#
+# A map entry is rendered verbatim: literal `{{ }}` meant for another
+# controller (an External Secrets template, say) is left alone. A string entry
+# is passed through `tpl` and may use .Release, .Values and the chart helpers.
+extraObjects: []
+# - apiVersion: external-secrets.io/v1
+#   kind: ExternalSecret
+#   metadata:
+#     name: onetime-master-key
+#   spec:
+#     secretStoreRef: { kind: ClusterSecretStore, name: vault }
+#     target: { name: onetime-master-key }
+#     data:
+#       - secretKey: master.keys
+#         remoteRef: { key: onetime-master-keys }
+# - |
+#   apiVersion: v1
+#   kind: ConfigMap
+#   metadata:
+#     name: {{ .Release.Name }}-extra
+#   data: {}
+
 tests:
   enabled: true
   image:

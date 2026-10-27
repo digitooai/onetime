@@ -1,0 +1,16 @@
+{{/*
+Arbitrary extra manifests released together with the chart, e.g. the
+ExternalSecret or SealedSecret that provides masterKey.existingSecret.
+
+A map entry is rendered verbatim, so literal `{{ }}` meant for another
+controller (an External Secrets template, say) reaches the cluster untouched.
+A string entry is passed through `tpl` first and may use .Release, .Values etc.
+*/}}
+{{- range .Values.extraObjects }}
+---
+{{- if typeIs "string" . }}
+{{ tpl . $ }}
+{{- else }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}

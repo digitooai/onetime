@@ -446,6 +446,11 @@
     "extraVolumes": { "type": "array", "items": { "type": "object" } },
     "extraVolumeMounts": { "type": "array", "items": { "type": "object" } },
     "extraContainers": { "type": "array", "items": { "type": "object" } },
+    "extraObjects": {
+      "type": "array",
+      "items": { "type": ["object", "string"] },
+      "description": "Extra manifests. Maps are rendered verbatim; strings are passed through tpl."
+    },
 
     "tests": {
       "type": "object",

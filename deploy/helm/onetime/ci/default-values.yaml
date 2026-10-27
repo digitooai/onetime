@@ -31,3 +31,19 @@ serviceMonitor:
 
 prometheusRule:
   enabled: true
+
+# Both shapes of extraObjects: a map rendered verbatim (its `{{ }}` must survive
+# untouched) and a string passed through tpl.
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ci-extra-verbatim
+    data:
+      template: '{{ .not.for.helm }}'
+  - |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ .Release.Name }}-extra-tpl
+    data: {}

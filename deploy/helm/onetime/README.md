@@ -235,6 +235,7 @@ default-deny egress would otherwise leave the app permanently not-ready.
 | `prometheusRule.enabled` | bool | `false` | |
 | `prometheusRule.rules.*.enabled` / `.severity` | | | Per-alert toggles. |
 | `extraVolumes` / `extraVolumeMounts` / `extraContainers` | list | `[]` | |
+| `extraObjects` | list | `[]` | Extra manifests (e.g. an ExternalSecret for `masterKey.existingSecret`). Maps are rendered verbatim, strings go through `tpl`. |
 | `tests.enabled` | bool | `true` | `helm test` pod. |
 
 ---
