@@ -48,6 +48,7 @@ env:
   PULL_SECRET: acr-pull
   AKS_RESOURCE_GROUP: digitoo-dev
   AKS_CLUSTER: digitoo-prod
+  SECRET_STORE: prod-secret-store
 
 jobs:
   deploy:
@@ -150,20 +151,22 @@ jobs:
             --dry-run=client -o yaml \
             | kubectl --context "${AKS_CLUSTER}" apply -f -
 
-      - name: Verify the master key Secret already exists
+      - name: Verify the secret store is ready
         run: |
-          # The chart would happily create its own Secret from masterKey.value,
-          # and a deploy that quietly swaps the keyring makes every stored
-          # secret undecryptable without a single error in the logs. Refuse to
-          # proceed unless the externally managed Secret is really there.
-          if ! kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" get secret onetime-master-key >/dev/null 2>&1; then
-            echo "::error::Secret onetime-master-key is missing in namespace ${NAMESPACE}."
-            echo "Create it before deploying:"
-            echo "  kubectl -n ${NAMESPACE} create secret generic onetime-master-key \\"
-            echo "    --from-literal=master.keys=\"v1:\$(head -c 32 /dev/urandom | base64)\""
+          # The master keyring and the Dragonfly password are synced from Azure
+          # Key Vault by ExternalSecrets (extraObjects in values-production.yaml),
+          # so the store has to be ready before the pod can mount either. Failing
+          # here is clearer than a pod stuck in ContainerCreating until --timeout.
+          #
+          # The keyring entry itself (onetime-prod-master-keys) is created once
+          # by hand in Key Vault; see docs/RUNBOOK.md. It is the only copy.
+          ready=$(kubectl --context "${AKS_CLUSTER}" get clustersecretstore "${SECRET_STORE}" \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+          if [ "${ready}" != "True" ]; then
+            echo "::error::ClusterSecretStore ${SECRET_STORE} is missing or not Ready."
             exit 1
           fi
-          echo "master key Secret present"
+          echo "secret store ${SECRET_STORE} ready"
 
       - name: Helm diff (render only)
         env:
@@ -224,6 +227,7 @@ jobs:
         if: failure()
         run: |
           kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" get all,pvc --sort-by=.metadata.creationTimestamp || true
+          kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" get externalsecret -o wide || true
           kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" describe deploy "${RELEASE_NAME}" || true
           kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" logs -l app.kubernetes.io/name=onetime --all-containers --tail=200 || true
           echo "::notice::if the release is stuck in pending-upgrade, run: helm rollback ${RELEASE_NAME} -n ${NAMESPACE} --kube-context ${AKS_CLUSTER}"
