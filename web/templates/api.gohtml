@@ -43,7 +43,7 @@
       <h2>{{call .T "api.s.quickstart.title"}}</h2>
       <p>{{call .T "api.s.quickstart.body"}}</p>
       <div class="code" data-copy>
-<pre>curl -s https://onetime.fortion.cloud/api/v1/secret \
+<pre>curl -s https://onetime.digitoo.ai/api/v1/secret \
   -H <span class="tok-str">'content-type: application/json'</span> \
   -d <span class="tok-str">'{"secret":"hunter2","ttl_days":7}'</span></pre>
       </div>
@@ -66,8 +66,8 @@
 
 <span class="tok-com">// 201 Created</span>
 {
-  <span class="tok-key">"secret_url"</span>: <span class="tok-str">"https://onetime.fortion.cloud/s/7Kq2…#Xf9…"</span>,
-  <span class="tok-key">"receipt_url"</span>: <span class="tok-str">"https://onetime.fortion.cloud/m/3Bd1…#Qa2…"</span>,
+  <span class="tok-key">"secret_url"</span>: <span class="tok-str">"https://onetime.digitoo.ai/s/7Kq2…#Xf9…"</span>,
+  <span class="tok-key">"receipt_url"</span>: <span class="tok-str">"https://onetime.digitoo.ai/m/3Bd1…#Qa2…"</span>,
   <span class="tok-key">"kind"</span>: <span class="tok-str">"text"</span>,
   <span class="tok-key">"size"</span>: 7,
   <span class="tok-key">"has_passphrase"</span>: false,
@@ -83,7 +83,7 @@
       <p class="endpoint"><span class="endpoint__verb">POST</span> /api/v1/secret/file</p>
       <p>{{call .T "api.s.file.body"}}</p>
       <div class="code" data-copy>
-<pre>curl -s https://onetime.fortion.cloud/api/v1/secret/file \
+<pre>curl -s https://onetime.digitoo.ai/api/v1/secret/file \
   -F <span class="tok-str">'ttl_days=7'</span> \
   -F <span class="tok-str">'passphrase='</span> \
   -F <span class="tok-str">'file=@report.pdf'</span>   <span class="tok-com"># must be the last field</span></pre>
@@ -211,7 +211,7 @@ X-Onetime-Ticket: <span class="tok-str">"…"</span></pre>
       <h2>{{call .T "api.s.agents.title"}}</h2>
       <p>{{call .T "api.s.agents.body"}}</p>
       <div class="code" data-copy>
-<pre>curl -s https://onetime.fortion.cloud/api/v1/generate \
+<pre>curl -s https://onetime.digitoo.ai/api/v1/generate \
   -H <span class="tok-str">'content-type: application/json'</span> \
   -d <span class="tok-str">'{"length":24,"alphabet":"symbols","return_value":false}'</span> \
   | jq -r <span class="tok-str">'.secret_url'</span>

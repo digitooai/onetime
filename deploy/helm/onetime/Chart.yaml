@@ -12,10 +12,10 @@ appVersion: "0.1.0"
 
 kubeVersion: ">=1.25.0-0"
 
-home: https://onetime.fortion.cloud
+home: https://onetime.digitoo.ai
 sources:
-  - https://github.com/fortionnet/onetime
-icon: https://onetime.fortion.cloud/static/icon.png
+  - https://github.com/digitooai/onetime
+icon: https://onetime.digitoo.ai/static/icon.png
 
 keywords:
   - secrets
@@ -25,14 +25,14 @@ keywords:
   - security
 
 maintainers:
-  - name: Fortion
-    url: https://github.com/fortionnet
+  - name: Digitoo
+    url: https://github.com/digitooai
 
 annotations:
   artifacthub.io/license: Apache-2.0
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/images: |
     - name: onetime
-      image: ghcr.io/fortionnet/onetime:0.1.0
+      image: ghcr.io/digitooai/onetime:0.1.0
     - name: valkey
       image: valkey/valkey:8-alpine

@@ -39,7 +39,7 @@ services:
         VERSION: dev
         COMMIT: local
         BUILD_DATE: "1970-01-01T00:00:00Z"
-    image: ghcr.io/fortionnet/onetime:dev
+    image: ghcr.io/digitooai/onetime:dev
     depends_on:
       redis:
         condition: service_healthy

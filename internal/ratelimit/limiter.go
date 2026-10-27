@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/fortionnet/onetime/internal/store"
+	"github.com/digitooai/onetime/internal/store"
 )
 
 // Action names one throttled operation. Separate buckets mean a burst of page

@@ -30,7 +30,7 @@ Data keys consumed here (all supplied by the handler):
 {{- end}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="{{.CSS}}">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 </head>
@@ -88,12 +88,12 @@ Data keys consumed here (all supplied by the handler):
            current tab holds something that cannot be fetched again, and a
            same-tab navigation would destroy it. */}}
     <div class="brand">
-      <a class="brand__logo" href="https://fortion.cz" target="_blank" rel="noopener"
+      <a class="brand__logo" href="https://digitoo.ai" target="_blank" rel="noopener"
          aria-label="{{call .T "site.brand_aria"}}">
         {{- /* alt="" on purpose: the link already carries the accessible name,
                and a named image inside it would be announced twice. */}}
-        <img class="brand__mark" src="{{asset "img/fortion-blue.svg"}}" alt=""
-             width="501" height="189" decoding="async">
+        <img class="brand__mark" src="{{asset "img/digitoo-blue.svg"}}" alt=""
+             width="520" height="103" decoding="async">
       </a>
       <a class="brand__suffix" href="/{{.Lang}}/" aria-label="{{call .T "site.home_aria"}}">{{call .T "site.name"}}</a>
     </div>

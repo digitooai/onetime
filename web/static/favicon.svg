@@ -1,5 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="onetime">
-  <rect width="32" height="32" rx="7" fill="#0000FF"/>
-  <path d="M16 7a5.5 5.5 0 0 0-5.5 5.5V14H10a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 10 24h12a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 22 14h-.5v-1.5A5.5 5.5 0 0 0 16 7Zm0 2.6a2.9 2.9 0 0 1 2.9 2.9V14h-5.8v-1.5A2.9 2.9 0 0 1 16 9.6Z" fill="#fff"/>
-  <circle cx="16" cy="19" r="2" fill="#00EA96"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Digitoo onetime">
+  <defs><clipPath id="r"><rect width="32" height="32" rx="7"/></clipPath></defs>
+  <g clip-path="url(#r)">
+    <rect x="0" y="0" width="16" height="16" fill="#006FF7"/>
+    <rect x="16" y="0" width="16" height="16" fill="#CFE6FF"/>
+    <rect x="0" y="16" width="16" height="16" fill="#FF6000"/>
+    <rect x="16" y="16" width="16" height="16" fill="#FFCCF7"/>
+  </g>
 </svg>

@@ -17,16 +17,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/fortionnet/onetime/internal/api"
-	"github.com/fortionnet/onetime/internal/blob"
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/crypto"
-	"github.com/fortionnet/onetime/internal/httpx"
-	"github.com/fortionnet/onetime/internal/observability"
-	"github.com/fortionnet/onetime/internal/ratelimit"
-	"github.com/fortionnet/onetime/internal/secret"
-	"github.com/fortionnet/onetime/internal/store"
-	"github.com/fortionnet/onetime/internal/web"
+	"github.com/digitooai/onetime/internal/api"
+	"github.com/digitooai/onetime/internal/blob"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/httpx"
+	"github.com/digitooai/onetime/internal/observability"
+	"github.com/digitooai/onetime/internal/ratelimit"
+	"github.com/digitooai/onetime/internal/secret"
+	"github.com/digitooai/onetime/internal/store"
+	"github.com/digitooai/onetime/internal/web"
 )
 
 // app is everything the server needs, assembled once at startup.

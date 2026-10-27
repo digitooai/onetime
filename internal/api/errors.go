@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/fortionnet/onetime/internal/httpx"
-	"github.com/fortionnet/onetime/internal/secret"
+	"github.com/digitooai/onetime/internal/httpx"
+	"github.com/digitooai/onetime/internal/secret"
 )
 
 // problemFor translates a domain error into the wire format.
@@ -58,7 +58,7 @@ func problemFor(err error) httpx.Problem {
 			Detail: "Revealing destroys the content, so it needs a deliberate action. " +
 				`Send {"confirm":true} to proceed.`,
 			Example: `printf '{"key":"%s","confirm":true}' "$KEY" | curl -sS -X POST ` +
-				`-H 'Content-Type: application/json' --data-binary @- https://onetime.fortion.cloud/api/v1/reveal`}
+				`-H 'Content-Type: application/json' --data-binary @- https://onetime.digitoo.ai/api/v1/reveal`}
 
 	case errors.Is(err, secret.ErrTooLarge):
 		return httpx.Problem{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge,

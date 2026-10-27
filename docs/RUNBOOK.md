@@ -146,9 +146,9 @@ kubectl -n onetime exec deploy/onetime -- onetime gc
 
 1. Zkontrolovat `onetime_secrets_active` — ideálně upgradovat mimo špičku,
    protože `Recreate` znamená 10–20 s výpadku.
-2. `helm upgrade --install onetime oci://ghcr.io/fortionnet/charts/onetime \
+2. `helm upgrade --install onetime oci://ghcr.io/digitooai/charts/onetime \
    --version X.Y.Z -n onetime -f values.production.yaml --atomic --timeout 5m`
-3. Ověřit: `curl -fsS https://onetime.fortion.cloud/readyz`, `/version` hlásí
+3. Ověřit: `curl -fsS https://onetime.digitoo.ai/readyz`, `/version` hlásí
    novou verzi, `onetime_secrets_active` se nepropadl.
 
 AOF živé secrety přes restart zachová.

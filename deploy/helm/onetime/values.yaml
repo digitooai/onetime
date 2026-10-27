@@ -17,7 +17,7 @@ replicaCount: 1
 
 image:
   registry: ghcr.io
-  repository: fortionnet/onetime
+  repository: digitooai/onetime
   # -- Overrides Chart.appVersion. Prefer pinning a digest in production.
   tag: ""
   # -- Immutable pin, e.g. "sha256:abc...". Wins over tag when set.
@@ -62,7 +62,7 @@ config:
   # -- REQUIRED. Public origin, used to build the one-time links themselves.
   # Must be https:// in production: the secret id travels in the URL, and a
   # single http:// link exposes it to anyone on the path.
-  baseURL: "https://onetime.fortion.cloud"
+  baseURL: "https://onetime.digitoo.ai"
 
   listenPort: 8080
   # Metrics listener. Deliberately a second port so it can be scraped
@@ -306,7 +306,7 @@ ingress:
   className: nginx
 
   # -- Public hostname. Should match the host part of config.baseURL.
-  host: onetime.fortion.cloud
+  host: onetime.digitoo.ai
 
   # -- Additional hosts served by the same backend.
   extraHosts: []

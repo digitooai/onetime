@@ -42,7 +42,7 @@ spec:
               {{ `{{ $value | printf "%.0f" }}` }} decrypt attempts in the last 5 minutes referenced a key id
               that is not in the current keyring. Those secrets are unreadable and will stay that way.
               STOP the rollout and restore the previous master keyring Secret before anything overwrites it.
-            runbook_url: https://github.com/fortionnet/onetime/blob/main/docs/runbook.md#unknown-key-id
+            runbook_url: https://github.com/digitooai/onetime/blob/main/docs/runbook.md#unknown-key-id
 {{- end }}
 {{- if $r.bruteForce.enabled }}
         # Sustained failed unlock attempts. Argon2 makes each guess expensive,

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/fortionnet/onetime/docs"
+	"github.com/digitooai/onetime/docs"
 )
 
 // llmsDoc renders the agent-facing usage text.

@@ -13,8 +13,8 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: fortionnet/onetime
-  CHART_REGISTRY: oci://ghcr.io/fortionnet/charts
+  IMAGE_NAME: digitooai/onetime
+  CHART_REGISTRY: oci://ghcr.io/digitooai/charts
   HELM_VERSION: v3.18.4
 
 jobs:
@@ -242,7 +242,7 @@ jobs:
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          cosign sign --yes "ghcr.io/fortionnet/charts/onetime@${DIGEST}"
+          cosign sign --yes "ghcr.io/digitooai/charts/onetime@${DIGEST}"
 
       - name: Upload chart artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -260,15 +260,15 @@ jobs:
             echo "## Helm chart"
             echo
             echo '```bash'
-            echo "helm install onetime oci://ghcr.io/fortionnet/charts/onetime --version ${VERSION} \\"
-            echo "  --set config.baseURL=https://onetime.fortion.cloud \\"
+            echo "helm install onetime oci://ghcr.io/digitooai/charts/onetime --version ${VERSION} \\"
+            echo "  --set config.baseURL=https://onetime.digitoo.ai \\"
             echo "  --set masterKey.existingSecret=onetime-master-key"
             echo '```'
             echo
             echo "Chart digest: \`${DIGEST}\`"
             echo
             echo '```bash'
-            echo "cosign verify ghcr.io/fortionnet/charts/onetime@${DIGEST} \\"
+            echo "cosign verify ghcr.io/digitooai/charts/onetime@${DIGEST} \\"
             echo "  --certificate-identity-regexp '^https://github.com/${{ github.repository }}/\\.github/workflows/release\\.yml@refs/tags/v.*\$' \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
@@ -316,13 +316,13 @@ jobs:
             echo
             echo '| Artefact | Reference |'
             echo '| --- | --- |'
-            echo "| Image | \`ghcr.io/fortionnet/onetime@${DIGEST}\` |"
-            echo "| Chart | \`oci://ghcr.io/fortionnet/charts/onetime\` version \`${GITHUB_REF_NAME#v}\` |"
+            echo "| Image | \`ghcr.io/digitooai/onetime@${DIGEST}\` |"
+            echo "| Chart | \`oci://ghcr.io/digitooai/charts/onetime\` version \`${GITHUB_REF_NAME#v}\` |"
             echo
             echo "Both are signed with cosign (keyless) and carry SLSA build provenance."
             echo
             echo '```bash'
-            echo "cosign verify ghcr.io/fortionnet/onetime@${DIGEST} \\"
+            echo "cosign verify ghcr.io/digitooai/onetime@${DIGEST} \\"
             echo "  --certificate-identity-regexp '^https://github.com/${{ github.repository }}/\\.github/workflows/release\\.yml@refs/tags/v.*\$' \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'

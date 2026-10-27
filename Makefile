@@ -11,10 +11,10 @@ VERSION    := $(shell git describe --tags --always --dirty 2>/dev/null || echo d
 COMMIT     := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-MODULE   := github.com/fortionnet/onetime
+MODULE   := github.com/digitooai/onetime
 BINARY   := onetime
 CMD      := ./cmd/onetime
-IMAGE    := ghcr.io/fortionnet/onetime
+IMAGE    := ghcr.io/digitooai/onetime
 CHART    := deploy/helm/onetime
 
 LDFLAGS := -s -w \

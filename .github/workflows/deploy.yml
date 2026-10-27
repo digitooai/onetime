@@ -34,18 +34,22 @@ env:
   HELM_VERSION: v3.18.4
   RELEASE_NAME: onetime
   NAMESPACE: onetime
-  CHART: oci://ghcr.io/fortionnet/charts/onetime
+  CHART: oci://ghcr.io/digitooai/charts/onetime
 
 jobs:
   deploy:
     name: Deploy to production
-    # Fortion's self-hosted Actions Runner Controller scale set, running inside
+    # Auto-deploy final releases only. A hyphenated tag (v1.5.0-rc.1) is marked
+    # prerelease by release.yml, and must never reach the prod cluster on its
+    # own — but workflow_dispatch can still ship anything on demand.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    # Digitoo's self-hosted Actions Runner Controller scale set, running inside
     # the target cluster. That is what makes an in-cluster kubeconfig viable and
     # keeps the API server off the public internet.
     runs-on: arc-runner-set
     environment:
       name: production
-      url: https://onetime.fortion.cloud
+      url: https://onetime.digitoo.ai
     permissions:
       contents: read
       packages: read

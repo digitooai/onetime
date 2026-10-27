@@ -1,4 +1,4 @@
-module github.com/fortionnet/onetime
+module github.com/digitooai/onetime
 
 go 1.25.0
 

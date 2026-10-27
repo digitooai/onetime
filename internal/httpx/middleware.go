@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fortionnet/onetime/internal/ratelimit"
+	"github.com/digitooai/onetime/internal/ratelimit"
 )
 
 type ctxKey int
@@ -136,7 +136,7 @@ func RejectSecretInQuery(next http.Handler) http.Handler {
 						Detail: "The value you just sent in the query string appeared in the URL and must be " +
 							"considered compromised. Rotate it, then send it in the request body instead.",
 						Example: "printf %s \"$VALUE\" | curl -sS --data-binary @- " +
-							"-H 'Content-Type: text/plain' https://onetime.fortion.cloud/api/v1/secret",
+							"-H 'Content-Type: text/plain' https://onetime.digitoo.ai/api/v1/secret",
 					})
 					return
 				}

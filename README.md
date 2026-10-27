@@ -3,13 +3,13 @@
 Jednorázové sdílení hesel a souborů. Odkaz jde otevřít jen jednou — po přečtení
 se obsah smaže. Bez registrace, bez účtu.
 
-Běží na **[onetime.fortion.cloud](https://onetime.fortion.cloud)**.
+Běží na **[onetime.digitoo.ai](https://onetime.digitoo.ai)**.
 
 ---
 
 ## Jak to funguje
 
-Odkaz má tvar `https://onetime.fortion.cloud/s/<id>#<klíč>`. Část za `#` je
+Odkaz má tvar `https://onetime.digitoo.ai/s/<id>#<klíč>`. Část za `#` je
 **fragment**, který prohlížeč nikdy neposílá na server. Z toho plyne celá
 bezpečnostní vlastnost služby:
 
@@ -34,9 +34,9 @@ s hotovými příkazy. Nasměrujte na něj agenta a nic dalšího nepotřebuje.
 Doporučený vzor: **server heslo vygeneruje a agent ho nikdy neuvidí.**
 
 ```bash
-curl -fsS -X POST https://onetime.fortion.cloud/api/v1/generate \
+curl -fsS -X POST https://onetime.digitoo.ai/api/v1/generate \
   -H 'Accept: text/plain' -d length=24 -d ttl=14d
-# https://onetime.fortion.cloud/s/Ky3fRp8mQz2wLd7vXn4bTa#8Qd2...
+# https://onetime.digitoo.ai/s/Ky3fRp8mQz2wLd7vXn4bTa#8Qd2...
 ```
 
 Na terminál se vypíše jen odkaz. Heslo neexistuje na stroji agenta, není
@@ -52,7 +52,7 @@ Když hodnota vzniká jinde, pošlete ji přes rouru — nikdy v argumentu:
 ```bash
 terraform output -raw db_password | curl -fsS --data-binary @- \
   -H 'Content-Type: text/plain' -H 'Accept: text/plain' \
-  https://onetime.fortion.cloud/api/v1/secret
+  https://onetime.digitoo.ai/api/v1/secret
 ```
 
 Soubor streamujte přes `-T` (nikoliv `--data-binary @soubor`, který ho celý
@@ -60,7 +60,7 @@ načte do paměti curlu):
 
 ```bash
 curl -fsS -T ./kubeconfig.yaml -H 'Accept: text/plain' \
-  'https://onetime.fortion.cloud/api/v1/secret/file?filename=kubeconfig.yaml'
+  'https://onetime.digitoo.ai/api/v1/secret/file?filename=kubeconfig.yaml'
 ```
 
 Strojově čitelná specifikace: `/api/v1/openapi.json`
@@ -110,10 +110,10 @@ osiřelý soubor, který garbage collector tiše uklidí.
 ## Provoz
 
 ```bash
-helm install onetime oci://ghcr.io/fortionnet/charts/onetime \
+helm install onetime oci://ghcr.io/digitooai/charts/onetime \
   --namespace onetime --create-namespace \
   --set masterKey.existingSecret=onetime-master-key \
-  --set ingress.host=onetime.fortion.cloud
+  --set ingress.host=onetime.digitoo.ai
 ```
 
 Jeden pod, jedno PVC, Redis jako sidecar na `127.0.0.1`. Master klíč se

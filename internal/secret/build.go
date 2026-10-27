@@ -9,9 +9,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/fortionnet/onetime/internal/blob"
-	"github.com/fortionnet/onetime/internal/crypto"
-	"github.com/fortionnet/onetime/internal/store"
+	"github.com/digitooai/onetime/internal/blob"
+	"github.com/digitooai/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/store"
 )
 
 // build holds the in-flight state of a secret being created. It exists so that

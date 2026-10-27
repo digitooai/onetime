@@ -6,7 +6,7 @@
     "summary": "One-time secret sharing. Anonymous, no account, no API key.",
     "description": "Every secret is addressed by a 32-byte key carried in the URL fragment, which browsers never transmit. The key is required to decrypt and is never stored, so a database dump alone reveals nothing. A secret is destroyed on the first confirmed read.\n\nSecrets must travel in the request body, never a query string. See /llms.txt for copy-paste examples."
   },
-  "servers": [{ "url": "{baseUrl}", "variables": { "baseUrl": { "default": "https://onetime.fortion.cloud" } } }],
+  "servers": [{ "url": "{baseUrl}", "variables": { "baseUrl": { "default": "https://onetime.digitoo.ai" } } }],
   "paths": {
     "/api/v1/secret": {
       "post": {

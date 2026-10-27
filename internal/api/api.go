@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/crypto"
-	"github.com/fortionnet/onetime/internal/httpx"
-	"github.com/fortionnet/onetime/internal/ratelimit"
-	"github.com/fortionnet/onetime/internal/secret"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/httpx"
+	"github.com/digitooai/onetime/internal/ratelimit"
+	"github.com/digitooai/onetime/internal/secret"
 )
 
 // Server holds the API dependencies.

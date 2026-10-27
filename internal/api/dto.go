@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fortionnet/onetime/internal/secret"
+	"github.com/digitooai/onetime/internal/secret"
 )
 
 // createRequest is the JSON body for creating a text secret.

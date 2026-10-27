@@ -99,7 +99,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/fortionnet/onetime
+        - github.com/digitooai/onetime
 
 issues:
   max-issues-per-linter: 0

@@ -17,11 +17,11 @@ import (
 	"strconv"
 	"strings"
 
-	webassets "github.com/fortionnet/onetime/web"
+	webassets "github.com/digitooai/onetime/web"
 
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/httpx"
-	"github.com/fortionnet/onetime/internal/i18n"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/httpx"
+	"github.com/digitooai/onetime/internal/i18n"
 )
 
 const langCookie = "lang"
@@ -103,7 +103,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 // handleRoot sends a browser to its language and a command-line client straight
-// to the usage text. Someone who runs `curl https://onetime.fortion.cloud`
+// to the usage text. Someone who runs `curl https://onetime.digitoo.ai`
 // almost certainly wants to know how to use it, not an HTML page.
 func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if httpx.PrefersPlainText(r) {

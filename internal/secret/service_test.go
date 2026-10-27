@@ -14,10 +14,10 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	redisclient "github.com/redis/go-redis/v9"
 
-	"github.com/fortionnet/onetime/internal/blob"
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/crypto"
-	"github.com/fortionnet/onetime/internal/store"
+	"github.com/digitooai/onetime/internal/blob"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/store"
 )
 
 type harness struct {

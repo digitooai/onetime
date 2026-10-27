@@ -3,10 +3,10 @@
 One-time secret and file sharing — single-use links, encrypted at rest, self-destructing.
 
 ```
-helm install onetime oci://ghcr.io/fortionnet/charts/onetime \
+helm install onetime oci://ghcr.io/digitooai/charts/onetime \
   --namespace onetime --create-namespace \
-  --set config.baseURL=https://onetime.fortion.cloud \
-  --set ingress.host=onetime.fortion.cloud \
+  --set config.baseURL=https://onetime.digitoo.ai \
+  --set ingress.host=onetime.digitoo.ai \
   --set masterKey.existingSecret=onetime-master-key
 ```
 
@@ -97,7 +97,7 @@ sync is permanently undecryptable. You find out hours later when a user reports
 | --- | --- | --- | --- |
 | `replicaCount` | int | `1` | Fixed at 1; schema enforces `maximum: 1`. |
 | `image.registry` | string | `ghcr.io` | |
-| `image.repository` | string | `fortionnet/onetime` | |
+| `image.repository` | string | `digitooai/onetime` | |
 | `image.tag` | string | `""` | Defaults to `.Chart.AppVersion`. |
 | `image.digest` | string | `""` | `sha256:...`. Wins over `tag`; the only reference that cannot be repointed under a running release. |
 | `image.pullPolicy` | string | `IfNotPresent` | |
@@ -113,7 +113,7 @@ sync is permanently undecryptable. You find out hours later when a user reports
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `config.baseURL` | string | `https://onetime.fortion.cloud` | **Required.** Origin used to build one-time links. Use `https://` — the secret id is in the URL path. |
+| `config.baseURL` | string | `https://onetime.digitoo.ai` | **Required.** Origin used to build one-time links. Use `https://` — the secret id is in the URL path. |
 | `config.listenPort` | int | `8080` | |
 | `config.metricsPort` | int | `9090` | Never routed by the Ingress. |
 | `config.defaultLang` | string | `cs` | `cs` or `en`. |
@@ -201,7 +201,7 @@ default-deny egress would otherwise leave the app permanently not-ready.
 | `service.metricsPort` | int | `9090` | |
 | `ingress.enabled` | bool | `true` | |
 | `ingress.className` | string | `nginx` | |
-| `ingress.host` | string | `onetime.fortion.cloud` | |
+| `ingress.host` | string | `onetime.digitoo.ai` | |
 | `ingress.extraHosts` | list | `[]` | |
 | `ingress.tls.enabled` | bool | `true` | |
 | `ingress.tls.clusterIssuer` | string | `letsencrypt-prod` | cert-manager. `""` to skip. |

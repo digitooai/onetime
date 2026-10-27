@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/i18n"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/i18n"
 )
 
 func newDiscardLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }

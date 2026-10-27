@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/fortionnet/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/crypto"
 )
 
 // Password alphabets. The unambiguous set omits characters that are easy to

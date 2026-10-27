@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fortionnet/onetime/internal/blob"
-	"github.com/fortionnet/onetime/internal/config"
-	"github.com/fortionnet/onetime/internal/crypto"
-	"github.com/fortionnet/onetime/internal/store"
+	"github.com/digitooai/onetime/internal/blob"
+	"github.com/digitooai/onetime/internal/config"
+	"github.com/digitooai/onetime/internal/crypto"
+	"github.com/digitooai/onetime/internal/store"
 )
 
 // Service orchestrates the secret lifecycle.

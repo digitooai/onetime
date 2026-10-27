@@ -1,4 +1,4 @@
-# Production overrides for onetime.fortion.cloud.
+# Production overrides for onetime.digitoo.ai.
 #
 # Used by .github/workflows/deploy.yml. Excluded from the packaged chart via
 # .helmignore — it is deployment configuration for one specific environment,
@@ -9,10 +9,10 @@
 # refuses to proceed without.
 #
 # Every value below was checked against the live cluster (RKE2 v1.34,
-# kubeconfig ~/.kube/config-fortion.prod) rather than assumed.
+# kubeconfig ~/.kube/config-digitoo.prod) rather than assumed.
 
 config:
-  baseURL: https://onetime.fortion.cloud
+  baseURL: https://onetime.digitoo.ai
   logLevel: info
   logFormat: json
   defaultLang: cs
@@ -36,7 +36,7 @@ config:
     maxFileBytes: 52428800
     totalStorageBytes: 21474836480   # 20 GiB, matches persistence.size
 
-  # Left at the built-in defaults for now. Raise these if Fortion staff start
+  # Left at the built-in defaults for now. Raise these if Digitoo staff start
   # hitting them: the limiter counts per client address, and everyone behind
   # one office NAT gateway shares a single address. See docs/RUNBOOK.md.
   rateLimits: {}
@@ -68,12 +68,12 @@ ingress:
   # NOT the community ingress-nginx. Two classes exist: "f5" is public-facing,
   # "f5-internal" is not reachable from outside.
   className: f5
-  host: onetime.fortion.cloud
+  host: onetime.digitoo.ai
 
   tls:
     enabled: true
     # The house default: 13 of 16 existing ingresses use the DNS-01 issuer.
-    # Switch to letsencrypt-prod (HTTP-01) if the fortion.cloud zone is not
+    # Switch to letsencrypt-prod (HTTP-01) if the digitoo.ai zone is not
     # managed by this cert-manager instance.
     clusterIssuer: letsencrypt-prod-dns01
 

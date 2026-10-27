@@ -71,10 +71,10 @@ ARG BUILD_DATE=unknown
 # repository and enables inherited repo permissions on the package.
 LABEL org.opencontainers.image.title="onetime" \
       org.opencontainers.image.description="One-time secret and file sharing (single-use links, encrypted at rest)" \
-      org.opencontainers.image.vendor="Fortion" \
-      org.opencontainers.image.source="https://github.com/fortionnet/onetime" \
-      org.opencontainers.image.url="https://onetime.fortion.cloud" \
-      org.opencontainers.image.documentation="https://github.com/fortionnet/onetime/blob/main/README.md" \
+      org.opencontainers.image.vendor="Digitoo" \
+      org.opencontainers.image.source="https://github.com/digitooai/onetime" \
+      org.opencontainers.image.url="https://onetime.digitoo.ai" \
+      org.opencontainers.image.documentation="https://github.com/digitooai/onetime/blob/main/README.md" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}" \
