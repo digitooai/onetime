@@ -7,7 +7,7 @@ go 1.25.0
 // and building with 1.25.0 pulled in 32 known standard-library
 // vulnerabilities that govulncheck rightly refused to pass. The runtime image
 // already used a patched toolchain; this makes CI agree.
-toolchain go1.25.14
+toolchain go1.26.10
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
