@@ -8,8 +8,19 @@
 # externally managed Secret `onetime-master-key`, which the deploy workflow
 # refuses to proceed without.
 #
-# Every value below was checked against the live cluster (RKE2 v1.34,
-# kubeconfig ~/.kube/config-digitoo.prod) rather than assumed.
+# Target cluster: Azure AKS `digitoo-prod` (resource group digitoo-dev), the
+# same cluster the other Digitoo services deploy to. Deployed by
+# .github/workflows/deploy.yml.
+
+# Image lives in Digitoo's ACR, like every other service. The tag is set on the
+# command line by the deploy workflow to the release version.
+image:
+  registry: digitooai.azurecr.io
+  repository: onetime
+
+# ACR pull secret, reconciled into the namespace by the deploy workflow.
+imagePullSecrets:
+  - name: acr-pull
 
 config:
   baseURL: https://onetime.digitoo.ai
@@ -18,19 +29,18 @@ config:
   defaultLang: cs
   strictStartup: true
 
-  # Cluster pod CIDR (canal "Network": 10.42.0.0/16; each node carves a /24).
+  # DIGITOO-TODO: set to the AKS pod CIDR. 10.42.0.0/16 was the RKE2 canal range
+  # and is wrong here. Azure CNI overlay commonly uses 10.244.0.0/16 — confirm
+  # with the cluster's network profile, or:
+  #   kubectl get nodes -o jsonpath='{range .items[*]}{.spec.podCIDR}{"\n"}{end}'
   #
-  # This is what makes per-client limiting work at all. Without it every request
-  # is attributed to the ingress controller's own pod IP, so the daily upload
-  # quota and the passphrase throttle become one bucket shared by every user —
-  # the first person to upload a few files locks out the whole company.
-  #
-  # The ingress pods are not on hostNetwork (verified), so the peer address the
-  # app sees really is a pod IP and this range is the right one. It cannot be
-  # narrowed further: the controller is a DaemonSet and its pods land in all
-  # three node ranges (10.42.0.x / 10.42.1.x / 10.42.2.x) with dynamic IPs.
+  # Why it matters: without the right range every request is attributed to the
+  # ingress controller's own pod IP, so the daily upload quota and the passphrase
+  # throttle collapse into one bucket shared by everyone — the first person to
+  # upload a few files locks out the whole company. A wrong value does not block
+  # the deploy; it only breaks per-client limiting until corrected.
   trustedProxies:
-    - 10.42.0.0/16
+    - 10.244.0.0/16
 
   limits:
     maxFileBytes: 52428800
@@ -57,8 +67,10 @@ redis:
 persistence:
   enabled: true
   size: 20Gi
-  # Cluster default; Ceph RBD is block storage, so ReadWriteOnce is native.
-  storageClass: csi-rbd-sc
+  # Empty string = use the AKS cluster default StorageClass (managed-csi), which
+  # is block storage and supports ReadWriteOnce natively. The RKE2 Ceph class
+  # (csi-rbd-sc) does not exist on AKS and would leave the PVC Pending.
+  storageClass: ""
   accessMode: ReadWriteOnce
 
 ingress:
@@ -72,10 +84,10 @@ ingress:
 
   tls:
     enabled: true
-    # The house default: 13 of 16 existing ingresses use the DNS-01 issuer.
-    # Switch to letsencrypt-prod (HTTP-01) if the digitoo.ai zone is not
-    # managed by this cert-manager instance.
-    clusterIssuer: letsencrypt-prod-dns01
+    # admin-console deploys to this same AKS cluster with letsencrypt-prod
+    # (HTTP-01), so that issuer is known to exist here. Switch to a DNS-01 issuer
+    # if the digitoo.ai zone is managed by this cert-manager instance.
+    clusterIssuer: letsencrypt-prod
 
   # The chart's built-in annotations are for the community controller and use
   # the nginx.ingress.kubernetes.io/ prefix. This controller ignores that prefix
@@ -85,7 +97,7 @@ ingress:
   #
   # Shape copied from tori/tori-api, which already solves the same problem here.
   overrideAnnotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 
     # Must exceed ONETIME_MAX_FILE_BYTES plus multipart framing.
     nginx.org/client-max-body-size: 52m
@@ -108,15 +120,17 @@ ingress:
   # avoids depending on the headers-more module being compiled into this
   # controller image.
 
+# Disabled for the AKS cutover: the selectors below were for the RKE2 cluster
+# (ingress controller in `nginx-ingress`, monitoring in `mon`) and would
+# silently block all inbound traffic on AKS, where those namespaces differ.
+# admin-console runs on this cluster without a NetworkPolicy. DIGITOO-TODO:
+# re-enable once the AKS ingress-controller and monitoring namespaces are
+# confirmed, then point the two selectors at them.
 networkPolicy:
-  enabled: true
-  # The controller lives in `nginx-ingress` on this cluster, not `ingress-nginx`
-  # as the chart default assumes. Getting this wrong does not fail loudly — it
-  # blocks all inbound traffic and the service is simply unreachable.
+  enabled: false
   ingressControllerNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: nginx-ingress
-  # Prometheus and Grafana live in `mon`.
   monitoringNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: mon

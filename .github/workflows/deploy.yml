@@ -1,9 +1,16 @@
 name: Deploy
 
-# Optional. Delete this file if you deploy with ArgoCD instead — and if you do,
-# make sure masterKey.autoGenerate is false, because ArgoCD renders with
-# `helm template`, where `lookup` is empty and every sync would mint a new
-# master key and silently orphan every stored secret.
+# Builds the release image into Digitoo's ACR and deploys it to the production
+# AKS cluster (digitoo-prod), release `onetime` in namespace `onetime`.
+#
+# Auth, registry and cluster access mirror the other Digitoo services (see
+# admin-console/.github/workflows/deploy-production.yml): a GitHub-hosted runner
+# pushes to digitooai.azurecr.io and authenticates to Azure to reach AKS, rather
+# than assuming a self-hosted runner inside the cluster.
+#
+# Note: release.yml still builds and cosign-signs a GHCR image as the public,
+# verifiable artefact. This workflow builds the image the cluster actually runs,
+# into ACR, because that is the only registry digitoo-prod is wired to pull.
 
 on:
   release:
@@ -11,11 +18,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Chart version to deploy (e.g. 1.4.2). Defaults to the latest release tag."
+        description: "Version to build and deploy (e.g. 1.4.2). Defaults to the release tag."
         required: false
         type: string
       dry_run:
-        description: "Render and diff only, do not apply."
+        description: "Build and render, but do not helm upgrade."
         required: false
         default: false
         type: boolean
@@ -34,7 +41,13 @@ env:
   HELM_VERSION: v3.18.4
   RELEASE_NAME: onetime
   NAMESPACE: onetime
-  CHART: oci://ghcr.io/digitooai/charts/onetime
+  HOSTNAME: onetime.digitoo.ai
+  CHART_PATH: deploy/helm/onetime
+  ACR_REGISTRY: digitooai.azurecr.io
+  IMAGE_NAME: onetime
+  PULL_SECRET: acr-pull
+  AKS_RESOURCE_GROUP: digitoo-dev
+  AKS_CLUSTER: digitoo-prod
 
 jobs:
   deploy:
@@ -43,26 +56,18 @@ jobs:
     # prerelease by release.yml, and must never reach the prod cluster on its
     # own — but workflow_dispatch can still ship anything on demand.
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
-    # Digitoo's self-hosted Actions Runner Controller scale set, running inside
-    # the target cluster. That is what makes an in-cluster kubeconfig viable and
-    # keeps the API server off the public internet.
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     environment:
       name: production
       url: https://onetime.digitoo.ai
     permissions:
       contents: read
-      packages: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.ref }}
           persist-credentials: false
-
-      - name: Set up Helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: ${{ env.HELM_VERSION }}
 
       - name: Resolve version
         id: v
@@ -77,41 +82,73 @@ jobs:
             exit 1
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "deploying chart version ${VERSION}"
+          echo "image_tag=${VERSION}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "deploying version ${VERSION}"
 
-      - name: Configure kubectl
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          if [ -n "${KUBE_CONFIG}" ]; then
-            mkdir -p "${HOME}/.kube"
-            printf '%s' "${KUBE_CONFIG}" | base64 -d > "${HOME}/.kube/config"
-            chmod 0600 "${HOME}/.kube/config"
-          else
-            # No secret: fall back to the runner pod's own ServiceAccount.
-            # That SA needs RBAC for Deployments, Services, Ingresses, PVCs,
-            # Secrets and ConfigMaps in the onetime namespace, and nothing else.
-            echo "using in-cluster credentials from the ARC runner ServiceAccount"
-          fi
-          kubectl version --output=yaml || true
-          kubectl get ns "${NAMESPACE}" || kubectl create ns "${NAMESPACE}"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" \
-            | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Log in to ACR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.DIGITOO_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DIGITOO_DOCKER_REGISTRY_PASSWORD }}
 
-      - name: Diff (render only)
-        env:
-          VERSION: ${{ steps.v.outputs.version }}
+      - name: Build and push image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          # AKS node pools are amd64, so a single-arch build is enough here; the
+          # multi-arch artefact is release.yml's job.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.v.outputs.version }}
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.v.outputs.image_tag }}
+          build-args: |
+            VERSION=${{ steps.v.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.pushed_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      # The two azure/* actions are tag-pinned to match admin-console (the
+      # proven deploy in this org). SHA-pin them to match the rest of the repo
+      # once you confirm the digests.
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.DIGITOO_AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v5.0.0
+        with:
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ env.AKS_CLUSTER }}
+
+      - name: Ensure namespace
         run: |
-          helm template "${RELEASE_NAME}" "${CHART}" \
-            --version "${VERSION}" \
-            --namespace "${NAMESPACE}" \
-            --values deploy/helm/onetime/values-production.yaml \
-            --set masterKey.existingSecret=onetime-master-key \
-            > /tmp/rendered.yaml
-          echo "rendered $(grep -c '^kind:' /tmp/rendered.yaml) objects"
+          kubectl --context "${AKS_CLUSTER}" get ns "${NAMESPACE}" \
+            || kubectl --context "${AKS_CLUSTER}" create ns "${NAMESPACE}"
+
+      - name: Ensure ACR pull secret
+        run: |
+          # The chart references imagePullSecrets[].name = acr-pull (see
+          # values-production.yaml). Reconcile it each deploy so a rotated ACR
+          # credential takes effect without a manual step.
+          kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" \
+            create secret docker-registry "${PULL_SECRET}" \
+            --docker-server="${ACR_REGISTRY}" \
+            --docker-username="${{ secrets.DIGITOO_DOCKER_REGISTRY_USERNAME }}" \
+            --docker-password="${{ secrets.DIGITOO_DOCKER_REGISTRY_PASSWORD }}" \
+            --dry-run=client -o yaml \
+            | kubectl --context "${AKS_CLUSTER}" apply -f -
 
       - name: Verify the master key Secret already exists
         run: |
@@ -119,7 +156,7 @@ jobs:
           # and a deploy that quietly swaps the keyring makes every stored
           # secret undecryptable without a single error in the logs. Refuse to
           # proceed unless the externally managed Secret is really there.
-          if ! kubectl -n "${NAMESPACE}" get secret onetime-master-key >/dev/null 2>&1; then
+          if ! kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" get secret onetime-master-key >/dev/null 2>&1; then
             echo "::error::Secret onetime-master-key is missing in namespace ${NAMESPACE}."
             echo "Create it before deploying:"
             echo "  kubectl -n ${NAMESPACE} create secret generic onetime-master-key \\"
@@ -128,37 +165,44 @@ jobs:
           fi
           echo "master key Secret present"
 
-      - name: helm upgrade --install
+      - name: Helm diff (render only)
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          helm template "${RELEASE_NAME}" "${CHART_PATH}" \
+            --namespace "${NAMESPACE}" \
+            --values "${CHART_PATH}/values-production.yaml" \
+            --set image.tag="${VERSION}" \
+            --set masterKey.existingSecret=onetime-master-key \
+            --set ingress.host="${HOSTNAME}" \
+            > /tmp/rendered.yaml
+          echo "rendered $(grep -c '^kind:' /tmp/rendered.yaml) objects"
+
+      - name: Helm upgrade --install
         if: ${{ !inputs.dry_run }}
         env:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           # --atomic rolls the release back automatically if it does not become
-          # healthy inside --timeout.
-          #
-          # Know what that costs here. With persistence enabled the chart uses
-          # `strategy: Recreate`, so a failed upgrade is: pod down, new pod up,
-          # new pod unhealthy, rollback tears it down again, old pod comes back.
-          # That is TWO outages instead of one, and the second one arrives while
-          # someone is already staring at the first.
-          #
-          # It is still the right default: an automatic rollback to a known-good
-          # release beats a half-applied one at 3am. But if you are debugging a
-          # deploy that keeps failing, drop --atomic and investigate the pod
-          # rather than letting Helm bounce it repeatedly.
-          helm upgrade --install "${RELEASE_NAME}" "${CHART}" \
-            --version "${VERSION}" \
+          # healthy inside --timeout. With persistence enabled the chart uses
+          # strategy: Recreate, so a failed upgrade is two brief outages rather
+          # than one — still the right default, but drop --atomic when you are
+          # debugging a deploy that keeps failing and want the pod left standing.
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
             --namespace "${NAMESPACE}" \
             --create-namespace \
-            --values deploy/helm/onetime/values-production.yaml \
+            --kube-context "${AKS_CLUSTER}" \
+            --values "${CHART_PATH}/values-production.yaml" \
+            --set image.tag="${VERSION}" \
             --set masterKey.existingSecret=onetime-master-key \
+            --set ingress.host="${HOSTNAME}" \
             --atomic \
-            --timeout 5m \
+            --timeout 10m \
             --wait
 
-      - name: helm test
+      - name: Helm test
         if: ${{ !inputs.dry_run }}
-        run: helm test "${RELEASE_NAME}" --namespace "${NAMESPACE}" --logs
+        run: helm test "${RELEASE_NAME}" --namespace "${NAMESPACE}" --kube-context "${AKS_CLUSTER}" --logs
 
       - name: Summary
         if: always()
@@ -168,17 +212,18 @@ jobs:
           {
             echo "## Deploy"
             echo
+            echo "- Cluster: \`${AKS_CLUSTER}\` (resource group \`${AKS_RESOURCE_GROUP}\`)"
+            echo "- Image: \`${ACR_REGISTRY}/${IMAGE_NAME}:${VERSION}\`"
             echo "- Release: \`${RELEASE_NAME}\` in \`${NAMESPACE}\`"
-            echo "- Chart version: \`${VERSION}\`"
             echo "- Dry run: \`${{ inputs.dry_run }}\`"
             echo
-            helm status "${RELEASE_NAME}" --namespace "${NAMESPACE}" 2>/dev/null | head -n 20 || true
+            helm status "${RELEASE_NAME}" --namespace "${NAMESPACE}" --kube-context "${AKS_CLUSTER}" 2>/dev/null | head -n 20 || true
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Diagnostics
         if: failure()
         run: |
-          kubectl -n "${NAMESPACE}" get all,pvc --sort-by=.metadata.creationTimestamp || true
-          kubectl -n "${NAMESPACE}" describe deploy "${RELEASE_NAME}" || true
-          kubectl -n "${NAMESPACE}" logs -l app.kubernetes.io/name=onetime --all-containers --tail=200 || true
-          echo "::notice::if the release is stuck in pending-upgrade, run: helm rollback ${RELEASE_NAME} -n ${NAMESPACE}"
+          kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" get all,pvc --sort-by=.metadata.creationTimestamp || true
+          kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" describe deploy "${RELEASE_NAME}" || true
+          kubectl --context "${AKS_CLUSTER}" -n "${NAMESPACE}" logs -l app.kubernetes.io/name=onetime --all-containers --tail=200 || true
+          echo "::notice::if the release is stuck in pending-upgrade, run: helm rollback ${RELEASE_NAME} -n ${NAMESPACE} --kube-context ${AKS_CLUSTER}"
