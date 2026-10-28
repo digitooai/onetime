@@ -4,13 +4,13 @@
 # .helmignore — it is deployment configuration for one specific environment,
 # not part of the reusable chart.
 #
-# NOTHING SECRET GOES IN THIS FILE. The master keyring lives in the
-# externally managed Secret `onetime-master-key`, which the deploy workflow
-# refuses to proceed without.
+# NOTHING SECRET GOES IN THIS FILE. The master keyring and the Dragonfly
+# password live in Azure Key Vault `prod-digitoo-shared-kv` and are synced into
+# the namespace by the ExternalSecrets in extraObjects at the bottom.
 #
 # Target cluster: Azure AKS `digitoo-prod` (resource group digitoo-dev), the
-# same cluster the other Digitoo services deploy to. Deployed by
-# .github/workflows/deploy.yml.
+# same cluster the other Digitoo services deploy to.
+
 
 # Image lives in Digitoo's ACR, like every other service. The tag is set on the
 # command line by the deploy workflow to the release version.
@@ -22,6 +22,13 @@ image:
 imagePullSecrets:
   - name: acr-pull
 
+# Scraped by annotation, like the rest of this cluster: digitoo-prod has no
+# Prometheus Operator CRDs, so ServiceMonitor/PrometheusRule are off below.
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: /metrics
+
 config:
   baseURL: https://onetime.digitoo.ai
   logLevel: info
@@ -29,64 +36,84 @@ config:
   defaultLang: cs
   strictStartup: true
 
-  # DIGITOO-TODO: set to the AKS pod CIDR. 10.42.0.0/16 was the RKE2 canal range
-  # and is wrong here. Azure CNI overlay commonly uses 10.244.0.0/16 — confirm
-  # with the cluster's network profile, or:
-  #   kubectl get nodes -o jsonpath='{range .items[*]}{.spec.podCIDR}{"\n"}{end}'
+  # AKS runs Azure CNI (not overlay): pods, including the F5 ingress controller,
+  # take their IPs from the node subnet 10.240.0.0/16. The ingress Service has
+  # externalTrafficPolicy: Local, so the client address reaches the controller
+  # intact and arrives here in X-Forwarded-For.
   #
   # Why it matters: without the right range every request is attributed to the
   # ingress controller's own pod IP, so the daily upload quota and the passphrase
-  # throttle collapse into one bucket shared by everyone — the first person to
-  # upload a few files locks out the whole company. A wrong value does not block
-  # the deploy; it only breaks per-client limiting until corrected.
+  # throttle collapse into one bucket shared by everyone.
   trustedProxies:
-    - 10.244.0.0/16
+    - 10.240.0.0/16
 
   limits:
     maxFileBytes: 52428800
-    totalStorageBytes: 21474836480   # 20 GiB, matches persistence.size
+    # 3 GiB: under the 85 % upload watermark of the 4Gi volume (~3.4 GiB).
+    totalStorageBytes: 3221225472
+    # 200 MiB/day per client address; at the 500 MiB default one office NAT
+    # address could fill the volume within a week.
+    dailyBytesPerIP: 209715200
 
-  # Left at the built-in defaults for now. Raise these if Digitoo staff start
-  # hitting them: the limiter counts per client address, and everyone behind
-  # one office NAT gateway shares a single address. See docs/RUNBOOK.md.
-  rateLimits: {}
+  # Raised for creation: the limiter counts per client address, and everyone
+  # behind one office NAT gateway shares a single address. See docs/RUNBOOK.md.
+  rateLimits:
+    createText: "300/50"
+    createFile: "100/20"
+    generate: "300/50"
 
 masterKey:
-  # Set again on the command line by the workflow; repeated here so that a
-  # manual `helm upgrade -f values-production.yaml` cannot accidentally fall
+  # Written by the ExternalSecret in extraObjects. Set again on the command line by the
+  # workflow, so a manual `helm upgrade -f values-production.yaml` cannot fall
   # back to a chart-generated key.
   existingSecret: onetime-master-key
   existingSecretKey: master.keys
   autoGenerate: false
   hardenPermissions: true
 
+# Shared Dragonfly `dragonfly-api-prod` in infra-apps, DB 0. The API and the
+# frontends select DBs 4-15 in code; DB 0 is onetime's alone. Every key carries
+# the `ots:` prefix. Never FLUSHDB/FLUSHALL here — see docs/RUNBOOK.md.
+#
+# Dragonfly runs without cache_mode, i.e. it never evicts, which is what the
+# app's noeviction startup check wants.
 redis:
-  mode: sidecar
-  maxmemory: 192mb
+  mode: external
+  external:
+    # No credentials here: the password is mounted from `onetime-redis`. The DB
+    # index is taken from the URL path.
+    url: redis://dragonfly-api-prod.infra-apps.svc.cluster.local:6379/0
+    db: 0
+    existingPasswordSecret: onetime-redis
+    passwordKey: password
 
 persistence:
   enabled: true
-  size: 20Gi
-  # Empty string = use the AKS cluster default StorageClass (managed-csi), which
-  # is block storage and supports ReadWriteOnce natively. The RKE2 Ceph class
-  # (csi-rbd-sc) does not exist on AKS and would leave the PVC Pending.
+  # Blobs only (file uploads and texts over 100 KiB); passwords live in
+  # Dragonfly. 4Gi is the smallest Azure disk billing tier (E1); the class
+  # allows online expansion if uploads ever need more.
+  size: 4Gi
+  # Empty string = the AKS default StorageClass (StandardSSD_LRS block storage).
   storageClass: ""
   accessMode: ReadWriteOnce
+
+# Static (non-autoscaled, non-spot) pool. With strategy Recreate and a zonal
+# RWO disk, every reschedule is an outage; keep the pod off pools that scale
+# down under it.
+nodeSelector:
+  digitoo.ai/node-type: static
 
 ingress:
   enabled: true
 
   # This cluster runs the NGINX Inc. controller (nginx.org/ingress-controller),
-  # NOT the community ingress-nginx. Two classes exist: "f5" is public-facing,
-  # "f5-internal" is not reachable from outside.
+  # NOT the community ingress-nginx. Its IngressClass is "f5".
   className: f5
   host: onetime.digitoo.ai
 
   tls:
     enabled: true
-    # admin-console deploys to this same AKS cluster with letsencrypt-prod
-    # (HTTP-01), so that issuer is known to exist here. Switch to a DNS-01 issuer
-    # if the digitoo.ai zone is managed by this cert-manager instance.
+    # Cloudflare DNS-01 issuer on this cluster.
     clusterIssuer: letsencrypt-prod
 
   # The chart's built-in annotations are for the community controller and use
@@ -120,12 +147,9 @@ ingress:
   # avoids depending on the headers-more module being compiled into this
   # controller image.
 
-# Disabled for the AKS cutover: the selectors below were for the RKE2 cluster
-# (ingress controller in `nginx-ingress`, monitoring in `mon`) and would
-# silently block all inbound traffic on AKS, where those namespaces differ.
-# admin-console runs on this cluster without a NetworkPolicy. DIGITOO-TODO:
-# re-enable once the AKS ingress-controller and monitoring namespaces are
-# confirmed, then point the two selectors at them.
+# Off: digitoo-prod runs with networkPolicy "none", so a NetworkPolicy would not
+# be enforced anyway. The selectors and egress below match this cluster, so it
+# can be switched on as-is once a policy engine is enabled.
 networkPolicy:
   enabled: false
   ingressControllerNamespaceSelector:
@@ -133,13 +157,22 @@ networkPolicy:
       kubernetes.io/metadata.name: nginx-ingress
   monitoringNamespaceSelector:
     matchLabels:
-      kubernetes.io/metadata.name: mon
+      kubernetes.io/metadata.name: monitoring
+  extraEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra-apps
+      ports:
+        - port: 6379
+          protocol: TCP
 
+# No Prometheus Operator CRDs on digitoo-prod; enabling either fails the
+# install. Metrics are scraped via podAnnotations above.
 serviceMonitor:
-  enabled: true
+  enabled: false
 prometheusRule:
-  enabled: true
-  additionalRuleLabels: {}
+  enabled: false
 
 resources:
   app:
@@ -153,3 +186,55 @@ resources:
 # no-op. See deploy/helm/onetime/README.md.
 podDisruptionBudget:
   enabled: false
+
+# ExternalSecrets (ClusterSecretStore `prod-secret-store` -> Key Vault
+# `prod-digitoo-shared-kv`). Maps in extraObjects are rendered verbatim, so the
+# External Secrets template below reaches the cluster without Helm evaluating it.
+# deletionPolicy Retain keeps the Secret if the vault entry is deleted or
+# renamed by mistake; the vault is the keyring's only backup.
+extraObjects:
+  # Master keyring ("v1:<base64>", newest first) -> masterKey.existingSecret.
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: onetime-master-key
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        kind: ClusterSecretStore
+        name: prod-secret-store
+      target:
+        name: onetime-master-key
+        creationPolicy: Owner
+        deletionPolicy: Retain
+      data:
+        - secretKey: master.keys
+          remoteRef:
+            key: onetime-prod-master-keys
+
+  # Dragonfly password -> redis.external.existingPasswordSecret. The vault entry
+  # is the redis://:<password>@dragonfly-api-prod.infra-apps:6379/ URL the API
+  # and frontends use; only the password is kept, so a rotation there reaches
+  # this deployment without a second copy. It stays percent-encoded as in the
+  # URL (sprig has no URL decoder), so the password must be URL-safe.
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: onetime-redis
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        kind: ClusterSecretStore
+        name: prod-secret-store
+      target:
+        name: onetime-redis
+        creationPolicy: Owner
+        deletionPolicy: Retain
+        template:
+          engineVersion: v2
+          data:
+            password: '{{ regexReplaceAll "^[^:]*:" (.url | urlParse).userinfo "" }}'
+      data:
+        - secretKey: url
+          remoteRef:
+            key: api-prod-redis-url

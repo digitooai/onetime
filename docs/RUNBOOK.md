@@ -1,5 +1,35 @@
 # Provozní runbook
 
+## Produkce (digitoo-prod)
+
+- AKS `digitoo-prod`, namespace `onetime`, release `onetime`, nasazuje
+  `.github/workflows/deploy.yml` s `deploy/helm/onetime/values-production.yaml`.
+- Redis je **sdílený Dragonfly `dragonfly-api-prod` v `infra-apps`, DB 0**
+  (`redis.mode: external`, žádný sidecar). DB 4–15 patří API a frontendům,
+  DB 0 je jen pro onetime a všechny klíče mají prefix `ots:`.
+  **Nikdy `FLUSHDB` ani `FLUSHALL`** — `FLUSHALL` smaže data celého API a DB 0
+  je výchozí pro každého klienta, který sdílenou URL použije bez `SELECT`.
+  Mazat jen podle vzoru `ots:*` (viz níže).
+- Master keyring je v Azure Key Vault `prod-digitoo-shared-kv`, položka
+  `onetime-prod-master-keys`. Heslo k Dragonfly se bere z `api-prod-redis-url`.
+  Obojí do namespace synchronizují ExternalSecrety `onetime-master-key`
+  a `onetime-redis` (ClusterSecretStore `prod-secret-store`), definované
+  v `extraObjects` ve `values-production.yaml`.
+- Prvotní vytvoření keyringu (jednou, hodnota nesmí skončit ve výstupu):
+
+  ```bash
+  az keyvault secret set --vault-name prod-digitoo-shared-kv \
+    --name onetime-prod-master-keys \
+    --value "v1:$(head -c 32 /dev/urandom | base64 -w0)" -o none
+  ```
+
+Smazání všech dat onetime v Dragonfly (místo `FLUSHDB`), na master podu:
+
+```bash
+M=$(kubectl -n infra-apps get pod -l app=dragonfly-api-prod,role=master -o name)
+kubectl -n infra-apps exec "$M" -- sh -c 'export REDISCLI_AUTH=$(tr "\0" "\n" </proc/1/cmdline | sed -n "s/^--requirepass=//p"); redis-cli -n 0 --scan --pattern "ots:*" | xargs -r -n 500 redis-cli -n 0 del'
+```
+
 ## Zálohování: záměrně ne
 
 Redis AOF ani PVC se **nezálohují**. Není to opomenutí — záloha úložiště
@@ -11,10 +41,16 @@ jednorázových secretů je anti-featura:
 
 Na PVC je proto anotace `velero.io/exclude-from-backup: "true"`.
 
+**Výjimka v produkci:** sdílený Dragonfly dělá snapshot každých 15 minut
+a jeho PVC se navíc snapshotuje (VolumeSnapshot). Metadata a inline texty onetime
+v nich tedy jsou — vědomě přijaté. Obsah je šifrovaný a bez klíče z fragmentu
+URL nečitelný, ale obnova Dragonfly ze snapshotu může vzkřísit už spálené odkazy.
+
 **Zálohuje se pouze:**
 
 1. `values.production.yaml` → git (infra repo)
-2. **master keyring** → password manager nebo SealedSecret v gitu
+2. **master keyring** → v produkci Azure Key Vault (`onetime-prod-master-keys`,
+   soft-delete chrání před smazáním)
 3. chart a image → ghcr.io (immutable tagy a digesty)
 
 Master keyring je jediná nenahraditelná věc. Ztráta Redisu znamená ztrátu živých
@@ -22,7 +58,24 @@ secretů a je to přijaté SLO — uživatelům to UI říká otevřeně.
 
 ## Rotace master klíče
 
-Díky keyringu je nedestruktivní. Nová položka jde **před** stávající:
+Díky keyringu je nedestruktivní. Nová položka jde **před** stávající.
+
+V produkci se rotuje v Key Vault (hodnoty se nevypisují):
+
+```bash
+OLD=$(az keyvault secret show --vault-name prod-digitoo-shared-kv \
+        --name onetime-prod-master-keys --query value -o tsv)
+az keyvault secret set --vault-name prod-digitoo-shared-kv \
+  --name onetime-prod-master-keys \
+  --value "v2:$(head -c 32 /dev/urandom | base64 -w0),${OLD}" -o none
+unset OLD
+
+kubectl -n onetime annotate externalsecret onetime-master-key \
+  force-sync="$(date +%s)" --overwrite
+kubectl -n onetime rollout restart deploy/onetime
+```
+
+Bez Key Vault (ručně spravovaný Secret):
 
 ```bash
 NEW=$(kubectl -n onetime exec deploy/onetime -- onetime keygen v2 | head -1)
@@ -49,10 +102,11 @@ platný" místo stacktrace — ale data jsou nenávratně pryč. Aplikace na to 
 startu upozorní hlasitým `ERROR`, pokud předtím aktivní klíč v keyringu chybí.
 
 **Ztráta master klíče úplně:** data jsou pryč. Obnova trvá pět minut a spočívá
-v tom, že se vygeneruje nový keyring, vyprázdní Redis a smažou bloby:
+v tom, že se vygeneruje nový keyring, vyprázdní Redis a smažou bloby. V produkci
+místo `FLUSHDB` smazat klíče `ots:*` (viz Produkce nahoře):
 
 ```bash
-kubectl -n onetime exec deploy/onetime -c redis -- redis-cli FLUSHDB
+kubectl -n onetime exec deploy/onetime -c redis -- redis-cli FLUSHDB   # jen sidecar, NE v produkci
 kubectl -n onetime exec deploy/onetime -- rm -rf /data/blobs/
 kubectl -n onetime rollout restart deploy/onetime
 ```
@@ -65,7 +119,7 @@ Právě proto je záloha klíče to jediné, co je kritické.
 |---|---|---|
 | `onetime_decrypt_failures_total{reason="unknown_key_id"} > 0` | **Rotace klíče proběhla špatně a právě přicházíte o data.** | Okamžitě vrátit chybějící položku do keyringu, pokud ji ještě někde máte. Každý další záznam pod ní je nečitelný natrvalo. |
 | `rate(onetime_lookup_total{result="bad_key"}) > 5/min` | Někdo zkouší hádat odkazy. | Neškodné (256 bitů entropie), ale zkontrolovat zdroj a případně zúžit rate limit nebo blokovat na ingressu. |
-| `onetime_redis_up == 0` po 2 min | Redis nedostupný. | Pod je unready a nedostává provoz. Zkontrolovat sidecar: `kubectl logs deploy/onetime -c redis`. |
+| `onetime_redis_up == 0` po 2 min | Redis nedostupný. | Pod je unready a nedostává provoz. Sidecar: `kubectl logs deploy/onetime -c redis`. Produkce: stav `dragonfly-api-prod` v `infra-apps` a ExternalSecret `onetime-redis` (heslo). |
 | `onetime_secrets_active` propad > 50 % za 5 min | Pravděpodobná ztráta Redisu nebo AOF. | Zkontrolovat, jestli neproběhl neplánovaný restart nebo `FLUSHDB`. Data jsou pryč, obnova neexistuje. |
 | volné místo na PVC < 15 % | Svazek se plní. | `onetime gc --force`, pak zvětšit PVC nebo snížit `maxTTL`. Nad 85 % se odmítají nové soubory (`507`), texty jdou dál. |
 | `onetime_reaper_orphans_deleted_total` trvale roste | Bloby ztrácejí své záznamy. | Zkontrolovat, jestli Redis nerestartuje nebo neevictuje (`maxmemory-policy` musí být `noeviction`). |
@@ -79,7 +133,7 @@ Právě proto je záloha klíče to jediné, co je kritické.
 | Redis AOF poškozený | Redis nenastartuje, CrashLoop | `redis-check-aof --fix /data/redis/onetime.aof`. Když nepomůže, AOF smazat a restartovat — ztráta živých secretů je akceptovaná. |
 | Ztráta node nebo PVC | totální ztráta živých secretů | `helm upgrade --install` jinam, PVC se vytvoří prázdné. Žádná obnova ze zálohy neexistuje ani se nemá dělat. |
 | Regrese po deployi | | `helm rollback onetime`. Pozor: se `strategy: Recreate` to znamená druhý výpadek. PVC a Redis data zůstávají. |
-| Podezření na kompromitaci | | 1. `helm upgrade --set app.readOnly=true` (zastaví nové) 2. `kubectl scale deploy/onetime --replicas=0` 3. triage z logů (`secret.revealed` + `client_ip`) 4. `FLUSHALL` + smazat bloby 5. **rotovat keyring kompletně**, bez starých položek 6. scale up |
+| Podezření na kompromitaci | | 1. `helm upgrade --set app.readOnly=true` (zastaví nové) 2. `kubectl scale deploy/onetime --replicas=0` 3. triage z logů (`secret.revealed` + `client_ip`) 4. smazat data (`ots:*` v produkci, jinak `FLUSHALL`) + bloby 5. **rotovat keyring kompletně**, bez starých položek 6. scale up |
 
 ## Ladění rate limitů
 
